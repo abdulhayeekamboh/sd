@@ -11,7 +11,9 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: "https://mrhayee.vercel.app/" // allow your frontend
+}));
 app.use(express.json());
 
 // Fix __dirname in ES modules
