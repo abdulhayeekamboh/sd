@@ -12,7 +12,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(cors({
-  origin: "https://mrhayee.vercel.app/" // allow your frontend
+  origin: "https://mrhayee.vercel.app" // allow your frontend
 }));
 app.use(express.json());
 
