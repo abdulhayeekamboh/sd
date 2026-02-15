@@ -1,119 +1,154 @@
-// File: api/download.js
-import { readFile, readdir } from "fs/promises";
+import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
+import dotenv from "dotenv";
+import fs from "fs";
 import crypto from "crypto";
 
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ==========================
+// CORS Configuration
+// ==========================
+const FRONTEND_ORIGIN = "https://mrhayee.vercel.app";
+
+app.use(cors({
+  origin: FRONTEND_ORIGIN,
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+}));
+
+// ==========================
+// JSON Body Parser
+// ==========================
+app.use(express.json());
+
+// Fix __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Secret passwords from environment variables
+// ==========================
+// Environment variables check
+// ==========================
 const SECRET_PASSWORD_MAIN = process.env.SECRET_PASSWORD_MAIN;
 const SECRET_PASSWORD_PDF = process.env.SECRET_PASSWORD_PDF;
 
-// Public folder
-const PUBLIC_FOLDER = path.join(__dirname, "../public");
-const PDF_FILE_PATH = path.join(__dirname, "../private/PDF.rar");
+if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF) {
+  console.error("ERROR: SECRET_PASSWORD_MAIN or SECRET_PASSWORD_PDF not set in .env");
+  process.exit(1);
+}
 
-// Helper: generate random 20-char + 4-digit OTP filename
-function generateRandomFileName() {
+// ==========================
+// Dynamic public file logic
+// ==========================
+const publicFolder = path.join(__dirname, "public");
+let currentPublicFileName = "";
+
+// Function to generate random 20-char + 4-digit OTP filename
+function generatePublicFileName() {
   const randomPart = crypto.randomBytes(16).toString("hex").slice(0, 20);
   const otpPart = Math.floor(1000 + Math.random() * 9000);
   return `${randomPart}${otpPart}.rar`;
 }
 
-// ==========================
-// Handler
-// ==========================
-export default async function handler(req, res) {
-  // Enable CORS for your frontend
-  res.setHeader("Access-Control-Allow-Origin", "https://mrhayee.vercel.app");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+// Function to rename the single file in public folder
+function renameSinglePublicFile() {
+  try {
+    const files = fs.readdirSync(publicFolder)
+      .filter(f => fs.statSync(path.join(publicFolder, f)).isFile());
 
-  // Handle preflight OPTIONS request
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    if (files.length === 0) {
+      console.error("No file found in public folder to rename!");
+      return;
+    }
+
+    const oldFileName = files[0];
+    const oldFilePath = path.join(publicFolder, oldFileName);
+
+    const newFileName = generatePublicFileName();
+    const newFilePath = path.join(publicFolder, newFileName);
+
+    fs.renameSync(oldFilePath, newFilePath);
+    currentPublicFileName = newFileName;
+    console.log("Public file renamed to:", currentPublicFileName);
+  } catch (err) {
+    console.error("Error renaming public file:", err);
   }
+}
 
-  // ==========================
-  // POST /download → get current dynamic file
-  // ==========================
-  if (req.method === "POST" && req.url === "/api/download") {
-    const { password } = req.body;
+// Initial rename
+renameSinglePublicFile();
 
-    if (password !== SECRET_PASSWORD_MAIN) {
-      return res.status(401).json({ message: "Wrong password" });
-    }
+// Rename every 1 minute
+setInterval(renameSinglePublicFile, 60 * 1000);
 
-    // Get the first file in public folder (read-only in serverless)
-    let files;
-    try {
-      files = await readdir(PUBLIC_FOLDER);
-    } catch (err) {
-      console.error("Error reading public folder:", err);
-      return res.status(500).json({ message: "Server error" });
-    }
+// ==========================
+// Route: Get current public file name (POST)
+// ==========================
+app.post("/download", (req, res) => {
+  const { password } = req.body;
 
-    if (!files || files.length === 0) {
-      return res.status(404).json({ message: "No public file found" });
-    }
-
-    // Generate a dynamic filename (client sees this)
-    const dynamicFileName = generateRandomFileName();
-
+  if (password === SECRET_PASSWORD_MAIN) {
     return res.json({
       success: true,
-      fileName: dynamicFileName,
-      originalFile: files[0], // server-side mapping
+      fileName: currentPublicFileName
     });
+  } else {
+    return res.status(401).json({ message: "Wrong password" });
+  }
+});
+
+// ==========================
+// Route: Download dynamic public file (GET)
+// ==========================
+app.get("/download-file/:fileName", (req, res) => {
+  const { fileName } = req.params;
+  const filePath = path.join(publicFolder, fileName);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("File not found");
   }
 
-  // ==========================
-  // GET /download-file/:fileName → download file
-  // ==========================
-  if (req.method === "GET" && req.url.startsWith("/api/download-file")) {
-    const urlParts = req.url.split("/");
-    const fileName = urlParts[urlParts.length - 1];
-    const filePath = path.join(PUBLIC_FOLDER, fileName);
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
 
-    try {
-      const file = await readFile(filePath);
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=${fileName}`
-      );
-      res.setHeader("Content-Type", "application/x-rar-compressed");
-      return res.send(file);
-    } catch (err) {
-      console.error("Error reading public file:", err);
-      return res.status(404).send("File not found");
+  res.download(filePath, fileName, (err) => {
+    if (err) console.error("Error sending file:", err);
+  });
+});
+
+// ==========================
+// Route: Download PDF file (POST)
+// ==========================
+app.post("/download-pdf", (req, res) => {
+  const { password } = req.body;
+
+  if (password === SECRET_PASSWORD_PDF) {
+    const filePath = path.join(__dirname, "private/PDF.rar");
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send("PDF file not found");
     }
+
+    res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+
+    res.download(filePath, "PDF.rar", (err) => {
+      if (err) {
+        console.error("Error sending PDF file:", err);
+        return res.status(500).send("Error sending file");
+      }
+    });
+  } else {
+    return res.status(401).json({ message: "Wrong password" });
   }
+});
 
-  // ==========================
-  // POST /download-pdf → download PDF file
-  // ==========================
-  if (req.method === "POST" && req.url === "/api/download-pdf") {
-    const { password } = req.body;
-
-    if (password !== SECRET_PASSWORD_PDF) {
-      return res.status(401).json({ message: "Wrong password" });
-    }
-
-    try {
-      const file = await readFile(PDF_FILE_PATH);
-      res.setHeader("Content-Disposition", "attachment; filename=PDF.rar");
-      res.setHeader("Content-Type", "application/x-rar-compressed");
-      return res.send(file);
-    } catch (err) {
-      console.error("Error reading PDF file:", err);
-      return res.status(500).send("Error sending PDF");
-    }
-  }
-
-  // ==========================
-  // Fallback
-  // ==========================
-  res.status(404).json({ message: "Not found" });
-}
+// ==========================
+// Start server
+// ==========================
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
