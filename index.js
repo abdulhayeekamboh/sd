@@ -22,9 +22,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type"]
 }));
 
-// ==========================
-// JSON Body Parser
-// ==========================
 app.use(express.json());
 
 // Fix __dirname in ES modules
@@ -46,16 +43,16 @@ if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF) {
 // Dynamic public file logic
 // ==========================
 const publicFolder = path.join(__dirname, "public");
-let currentPublicFileName = "";
+let currentPublicFileName = ""; // will store the current file name
 
-// Function to generate random 20-char + 4-digit OTP filename
+// Generate random 20-char + 4-digit filename
 function generatePublicFileName() {
   const randomPart = crypto.randomBytes(16).toString("hex").slice(0, 20);
   const otpPart = Math.floor(1000 + Math.random() * 9000);
   return `${randomPart}${otpPart}.rar`;
 }
 
-// Function to rename the single file in public folder
+// Rename the single file in public folder
 function renameSinglePublicFile() {
   try {
     const files = fs.readdirSync(publicFolder)
@@ -83,8 +80,8 @@ function renameSinglePublicFile() {
 // Initial rename
 renameSinglePublicFile();
 
-// Rename every 1 minute
-setInterval(renameSinglePublicFile, 60 * 1000);
+// Rename every 2 minutes (adjustable)
+setInterval(renameSinglePublicFile, 2 * 60 * 1000);
 
 // ==========================
 // Route: Get current public file name (POST)
@@ -93,6 +90,7 @@ app.post("/download", (req, res) => {
   const { password } = req.body;
 
   if (password === SECRET_PASSWORD_MAIN) {
+    // Send the CURRENT filename after password check
     return res.json({
       success: true,
       fileName: currentPublicFileName
@@ -103,7 +101,7 @@ app.post("/download", (req, res) => {
 });
 
 // ==========================
-// Route: Download dynamic public file (GET)
+// Route: Download the dynamic public file (GET)
 // ==========================
 app.get("/download-file/:fileName", (req, res) => {
   const { fileName } = req.params;
