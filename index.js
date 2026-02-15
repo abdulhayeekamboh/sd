@@ -15,12 +15,12 @@ const PORT = 3000;
 // CORS Configuration
 // ==========================
 app.use(cors({
-  origin: "https://mrhayee.vercel.app", // remove trailing slash
+  origin: "https://mrhayee.vercel.app", // allow frontend
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"]
 }));
 
-// Handle preflight OPTIONS requests globally
+// Handle preflight OPTIONS requests
 app.options("*", cors());
 
 // ==========================
@@ -75,7 +75,7 @@ renameSinglePublicFile();
 setInterval(renameSinglePublicFile, 60 * 1000);
 
 // ==========================
-// Route: Download main file
+// Route: Get current public file name (POST)
 // ==========================
 app.post("/download", (req, res) => {
   const { password } = req.body;
@@ -91,13 +91,36 @@ app.post("/download", (req, res) => {
 });
 
 // ==========================
-// Route: Download PDF file
+// Route: Download dynamic public file (GET)
+// ==========================
+app.get("/download-file/:fileName", (req, res) => {
+  const { fileName } = req.params;
+  const filePath = path.join(publicFolder, fileName);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("File not found");
+  }
+
+  // CORS header
+  res.setHeader("Access-Control-Allow-Origin", "https://mrhayee.vercel.app");
+
+  res.download(filePath, fileName, (err) => {
+    if (err) console.error("Error sending file:", err);
+  });
+});
+
+// ==========================
+// Route: Download PDF file (POST)
 // ==========================
 app.post("/download-pdf", (req, res) => {
   const { password } = req.body;
 
   if (password === SECRET_PASSWORD_PDF) {
     const filePath = path.join(__dirname, "private/PDF.rar");
+
+    // CORS header
+    res.setHeader("Access-Control-Allow-Origin", "https://mrhayee.vercel.app");
+
     res.download(filePath, "PDF.rar", (err) => {
       if (err) {
         console.error("Error sending PDF file:", err);
@@ -108,11 +131,6 @@ app.post("/download-pdf", (req, res) => {
     res.status(401).json({ message: "Wrong password" });
   }
 });
-
-// ==========================
-// Serve public folder
-// ==========================
-app.use("/public", express.static(publicFolder));
 
 // ==========================
 // Start server
