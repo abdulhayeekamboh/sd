@@ -1,21 +1,21 @@
 {
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon server.js"
+  },
   "dependencies": {
     "cors": "^2.8.6",
-    "crypto": "^1.0.1",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "googleapis": "^171.4.0",
     "node-fetch": "^3.3.2"
   },
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "node index.js",
-  "scripts": {
-    "start": "node server.js"
-  },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "module"
+  "license": "ISC"
 }
