@@ -11,9 +11,21 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// ==========================
+// CORS Configuration
+// ==========================
 app.use(cors({
-  origin: "https://mrhayee.vercel.app" // allow your frontend
+  origin: "https://mrhayee.vercel.app", // remove trailing slash
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
 }));
+
+// Handle preflight OPTIONS requests globally
+app.options("*", cors());
+
+// ==========================
+// JSON Body Parser
+// ==========================
 app.use(express.json());
 
 // Fix __dirname in ES modules
@@ -34,27 +46,24 @@ let currentPublicFileName = "";
 function generatePublicFileName() {
   const randomPart = crypto.randomBytes(16).toString("hex").slice(0, 20);
   const otpPart = Math.floor(1000 + Math.random() * 9000);
-  return `${randomPart}${otpPart}.rar`; // new file name with extension
+  return `${randomPart}${otpPart}.rar`;
 }
 
 // Function to rename the single file in public folder
 function renameSinglePublicFile() {
-  // Get the file in public folder
   const files = fs.readdirSync(publicFolder).filter(f => fs.statSync(path.join(publicFolder, f)).isFile());
   if (files.length === 0) {
     console.error("No file found in public folder to rename!");
     return;
   }
 
-  const oldFileName = files[0]; // pick the single file
+  const oldFileName = files[0];
   const oldFilePath = path.join(publicFolder, oldFileName);
 
   const newFileName = generatePublicFileName();
   const newFilePath = path.join(publicFolder, newFileName);
 
-  // Rename the file
   fs.renameSync(oldFilePath, newFilePath);
-
   currentPublicFileName = newFileName;
   console.log("Public file renamed to:", currentPublicFileName);
 }
@@ -72,7 +81,6 @@ app.post("/download", (req, res) => {
   const { password } = req.body;
 
   if (password === SECRET_PASSWORD_MAIN) {
-    // Send the current public file name to frontend
     res.json({
       success: true,
       fileName: currentPublicFileName
@@ -90,10 +98,9 @@ app.post("/download-pdf", (req, res) => {
 
   if (password === SECRET_PASSWORD_PDF) {
     const filePath = path.join(__dirname, "private/PDF.rar");
-
     res.download(filePath, "PDF.rar", (err) => {
       if (err) {
-        console.log("Error sending PDF file:", err);
+        console.error("Error sending PDF file:", err);
         res.status(500).send("Error sending file");
       }
     });
@@ -107,6 +114,9 @@ app.post("/download-pdf", (req, res) => {
 // ==========================
 app.use("/public", express.static(publicFolder));
 
+// ==========================
+// Start server
+// ==========================
 app.listen(PORT, () =>
   console.log(`Server running on http://localhost:${PORT}`)
 );
