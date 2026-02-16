@@ -12,9 +12,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN = "https://mrhayee.vercel.app";
 
-// ==========================
-// Middleware
-// ==========================
 app.use(cors({
   origin: FRONTEND_ORIGIN,
   methods: ["GET", "POST"],
@@ -23,89 +20,42 @@ app.use(cors({
 
 app.use(express.json());
 
-// ==========================
-// Fix __dirname (ESM)
-// ==========================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ==========================
-// ENV validation
+// ENV check
 // ==========================
 const SECRET_PASSWORD_MAIN = process.env.SECRET_PASSWORD_MAIN;
 const SECRET_PASSWORD_PDF = process.env.SECRET_PASSWORD_PDF;
 
 if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF) {
-  console.error("❌ Missing passwords in .env");
+  console.error("Missing passwords in .env");
   process.exit(1);
 }
 
 // ==========================
-// Public folder setup
+// Real file paths
 // ==========================
-const publicFolder = path.join(__dirname, "public");
-let currentPublicFileName = "";
+const rarRealPath = path.join(__dirname, "public/secret.rar");
+const pdfPath = path.join(__dirname, "private/PDF.rar");
 
-// Serve public files statically
-app.use("/public", express.static(publicFolder));
+if (!fs.existsSync(rarRealPath)) {
+  console.error("Put secret.rar inside /public");
+  process.exit(1);
+}
 
 // ==========================
-// Helpers
+// Generate virtual filename
 // ==========================
-function generateRandomFileName() {
+function generateVirtualName() {
   const rand = crypto.randomBytes(16).toString("hex").slice(0, 20);
   const otp = Math.floor(1000 + Math.random() * 9000);
   return `${rand}${otp}.rar`;
 }
 
 // ==========================
-// Rename logic
-// ==========================
-function renamePublicFile() {
-  try {
-    const files = fs.readdirSync(publicFolder)
-      .filter(f => f.endsWith(".rar"));
-
-    if (files.length !== 1) {
-      console.error("❌ Public folder must contain EXACTLY one .rar file");
-      return;
-    }
-
-    const oldName = files[0];
-    const newName = generateRandomFileName();
-
-    fs.renameSync(
-      path.join(publicFolder, oldName),
-      path.join(publicFolder, newName)
-    );
-
-    currentPublicFileName = newName;
-    console.log("✅ Current public file:", currentPublicFileName);
-
-  } catch (err) {
-    console.error("❌ Rename error:", err);
-  }
-}
-
-// ==========================
-// Startup validation
-// ==========================
-const startupFiles = fs.readdirSync(publicFolder)
-  .filter(f => f.endsWith(".rar"));
-
-if (startupFiles.length !== 1) {
-  console.error("❌ Put EXACTLY ONE .rar file in /public before starting");
-  process.exit(1);
-}
-
-currentPublicFileName = startupFiles[0];
-renamePublicFile();
-
-// Rename every 2 minutes
-setInterval(renamePublicFile, 2 * 60 * 1000);
-
-// ==========================
-// ROUTE: Verify password → send RAR filename
+// ROUTE — verify password
 // ==========================
 app.post("/download", (req, res) => {
   const { password } = req.body;
@@ -114,15 +64,23 @@ app.post("/download", (req, res) => {
     return res.status(401).json({ message: "Wrong password" });
   }
 
-  return res.json({
+  const virtualName = generateVirtualName();
+
+  res.json({
     success: true,
-    fileName: currentPublicFileName,
-    downloadUrl: `/public/${currentPublicFileName}`
+    fileName: virtualName
   });
 });
 
 // ==========================
-// ROUTE: Secure PDF download
+// ROUTE — serve rar file
+// ==========================
+app.get("/download/:name", (req, res) => {
+  res.download(rarRealPath, req.params.name);
+});
+
+// ==========================
+// PDF route
 // ==========================
 app.post("/download-pdf", (req, res) => {
   const { password } = req.body;
@@ -131,25 +89,14 @@ app.post("/download-pdf", (req, res) => {
     return res.status(401).json({ message: "Wrong password" });
   }
 
-  const pdfPath = path.join(__dirname, "private/PDF.rar");
-
   if (!fs.existsSync(pdfPath)) {
-    return res.status(404).send("PDF file not found");
+    return res.status(404).send("PDF not found");
   }
 
-  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
-
-  res.download(pdfPath, "PDF.rar", err => {
-    if (err) {
-      console.error("❌ PDF send error:", err);
-      res.status(500).send("Error sending PDF");
-    }
-  });
+  res.download(pdfPath, "PDF.rar");
 });
 
 // ==========================
-// Start server
-// ==========================
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log("Server running")
+);
