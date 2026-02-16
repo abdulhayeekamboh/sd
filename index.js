@@ -3,7 +3,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import fs from "fs";
-import cors from "cors";
 
 dotenv.config();
 
@@ -14,13 +13,19 @@ const FRONTEND_ORIGIN = "https://mrhayee.vercel.app";
 // ==========================
 // UNIVERSAL CORS FIX
 // ==========================
-app.use(cors({
-  origin: FRONTEND_ORIGIN,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-}));
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-// ==========================
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 app.use(express.json());
 
 // Fix __dirname for ES modules
@@ -58,6 +63,9 @@ app.post("/download-pdf", (req, res) => {
     return res.status(404).send("PDF not found");
   }
 
+  // Set CORS headers explicitly for download
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.download(pdfPath, "PDF.rar");
 });
 
@@ -75,6 +83,9 @@ app.post("/download-personal", (req, res) => {
     return res.status(404).send("File not found");
   }
 
+  // Set CORS headers explicitly for download
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.download(personalPath, "personal_updated.rar");
 });
 
