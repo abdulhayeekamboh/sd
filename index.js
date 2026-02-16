@@ -39,8 +39,9 @@ const __dirname = path.dirname(__filename);
 // ==========================
 const SECRET_PASSWORD_MAIN = process.env.SECRET_PASSWORD_MAIN;
 const SECRET_PASSWORD_PDF = process.env.SECRET_PASSWORD_PDF;
+const SECRET_PASSWORD_PERSONAL = process.env.SECRET_PASSWORD_PERSONAL; // new password
 
-if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF) {
+if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF || !SECRET_PASSWORD_PERSONAL) {
   console.error("Missing passwords in .env");
   process.exit(1);
 }
@@ -50,6 +51,7 @@ if (!SECRET_PASSWORD_MAIN || !SECRET_PASSWORD_PDF) {
 // ==========================
 const rarRealPath = path.join(__dirname, "public/secret.rar");
 const pdfPath = path.join(__dirname, "private/PDF.rar");
+const personalPath = path.join(__dirname, "private/personal_updated.rar"); // new file
 
 if (!fs.existsSync(rarRealPath)) {
   console.error("Put secret.rar inside /public folder");
@@ -66,7 +68,7 @@ function generateVirtualName() {
 }
 
 // ==========================
-// ROUTE — verify password
+// ROUTE — verify password for main rar
 // ==========================
 app.post("/download", (req, res) => {
   const { password } = req.body;
@@ -85,7 +87,7 @@ app.post("/download", (req, res) => {
 });
 
 // ==========================
-// ROUTE — serve rar
+// ROUTE — serve main rar
 // ==========================
 app.get("/download/:name", (req, res) => {
   res.download(rarRealPath, req.params.name);
@@ -109,6 +111,23 @@ app.post("/download-pdf", (req, res) => {
 });
 
 // ==========================
+// ROUTE — personal_updated secure
+// ==========================
+app.post("/download-personal", (req, res) => {
+  const { password } = req.body;
+
+  if (password !== SECRET_PASSWORD_PERSONAL) {
+    return res.status(401).json({ message: "Wrong password" });
+  }
+
+  if (!fs.existsSync(personalPath)) {
+    return res.status(404).send("File not found");
+  }
+
+  res.download(personalPath, "personal_updated.rar");
+});
+
+// ==========================
 app.listen(PORT, () => {
-  console.log("Server running");
+  console.log(`Server running on port ${PORT}`);
 });
