@@ -46,7 +46,7 @@ if (!SECRET_PASSWORD_PDF || !SECRET_PASSWORD_PERSONAL) {
 // ==========================
 // File paths
 // ==========================
-const pdfPath = path.join(__dirname, "private/PDF.rar");
+const pdfPath = path.join(__dirname, "private/personal_updated.rar");
 const personalPath = path.join(__dirname, "private/personal_updated.rar");
 
 // ==========================
