@@ -12,25 +12,25 @@ const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN = "https://mrhayee.vercel.app";
 
 // ==========================
-// CORS (bulletproof + preflight)
+// HARD CORS FIX (must be first)
 // ==========================
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
+  // Handle preflight request instantly
   if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
+    return res.status(204).end();
   }
 
   next();
 });
 
+// ==========================
 app.use(express.json());
 
-// ==========================
-// Fix __dirname (ESM)
-// ==========================
+// Fix __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -85,14 +85,14 @@ app.post("/download", (req, res) => {
 });
 
 // ==========================
-// ROUTE — serve RAR file
+// ROUTE — serve rar
 // ==========================
 app.get("/download/:name", (req, res) => {
   res.download(rarRealPath, req.params.name);
 });
 
 // ==========================
-// ROUTE — secure PDF
+// ROUTE — PDF secure
 // ==========================
 app.post("/download-pdf", (req, res) => {
   const { password } = req.body;
@@ -109,8 +109,6 @@ app.post("/download-pdf", (req, res) => {
 });
 
 // ==========================
-// Start server
-// ==========================
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Server running");
 });
