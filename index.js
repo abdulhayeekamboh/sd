@@ -6,55 +6,41 @@ const cors = require("cors");
 const app = express();
 const PORT = 3000;
 
-// Enable CORS for frontend
-app.use(cors({ origin: "*" })); // Replace "*" with your frontend URL
+// Enable CORS for your frontend domain
+app.use(cors({
+  origin: "https://mrhayee.vercel.app", // your frontend
+  methods: ["GET", "POST"],             // allowed HTTP methods
+  credentials: true                     // allow cookies if needed
+})); // or replace * with your frontend URL
 app.use(express.json());
 
-// Set your password
+// Set your correct password here
 const CORRECT_PASSWORD = "1234";
 
-// Max size in bytes to serve directly (example: 50 MB)
-const MAX_SAFE_SIZE = 50 * 1024 * 1024;
-
+// POST endpoint to download the RAR
 app.post("/download-personal", (req, res) => {
   try {
     const { password } = req.body;
 
+    // Verify password
     if (password !== CORRECT_PASSWORD) {
       return res.status(401).json({ message: "Incorrect password" });
     }
 
-    // File paths
-    const personalFile = path.join(__dirname, "private", "personal_updated.rar");
-    const fallbackFile = path.join(__dirname, "private", "pdf.rar");
+    const rarPath = path.join(__dirname, "private", "personal_updated.rar");
 
-    let fileToServe;
-
-    // Check if personal file exists and is under MAX_SAFE_SIZE
-    if (fs.existsSync(personalFile)) {
-      const stats = fs.statSync(personalFile);
-      if (stats.size <= MAX_SAFE_SIZE) {
-        fileToServe = personalFile;
-      } else {
-        console.log("personal_updated.rar is too big, serving pdf.rar instead");
-        fileToServe = fallbackFile;
-      }
-    } else if (fs.existsSync(fallbackFile)) {
-      fileToServe = fallbackFile;
-    } else {
-      return res.status(404).json({ message: "No file available for download" });
+    if (!fs.existsSync(rarPath)) {
+      return res.status(404).json({ message: "RAR file not found" });
     }
 
-    const fileName = path.basename(fileToServe);
-
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    // Stream the file as download
+    res.setHeader("Content-Disposition", "attachment; filename=personal_updated.rar");
     res.setHeader("Content-Type", "application/x-rar-compressed");
 
-    const stream = fs.createReadStream(fileToServe);
+    const stream = fs.createReadStream(rarPath);
     stream.pipe(res);
-
   } catch (err) {
-    console.error("Error serving file:", err);
+    console.error("Error serving RAR:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
